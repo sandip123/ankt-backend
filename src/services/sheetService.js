@@ -53,6 +53,16 @@ async function login(username, password) {
   };
 }
 
+async function getSummary() {
+  const rows = await getValues(`${flatSheetName}!J6:K9`);
+
+  return {
+    totalPending: rows[0]?.[1] || '',
+    ifChargePenalty: rows[2]?.[1] || '',
+    penalty: rows[3]?.[1] || ''
+  };
+}
+
 function validateSeries(series) {
   const normalizedSeries = String(series || '').trim().toUpperCase();
   const allowedSeries = ['A', 'B1', 'B2', 'SA'];
@@ -142,6 +152,7 @@ async function updateFlat(flatNo, updates) {
 
 module.exports = {
   login,
+  getSummary,
   getFlats,
   findFlat,
   updateFlat

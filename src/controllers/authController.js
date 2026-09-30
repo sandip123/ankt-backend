@@ -13,10 +13,12 @@ async function login(req, res, next) {
 
   try {
     const user = await sheetService.login(username, password);
+    const summary = await sheetService.getSummary();
     return res.json({
       success: true,
       message: 'Login successful',
-      user
+      user,
+      summary
     });
   } catch (error) {
     return next(error);

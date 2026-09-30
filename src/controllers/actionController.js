@@ -17,10 +17,12 @@ async function handleAction(req, res) {
         }
 
         const user = await sheetService.login(username, password);
+        const summary = await sheetService.getSummary();
         return res.json({
           success: true,
           message: 'Login successful',
-          user
+          user,
+          summary
         });
       }
 
