@@ -1,48 +1,51 @@
-const fs = require('fs');
-const path = require('path');
 const { google } = require('googleapis');
 
 const scopes = ['https://www.googleapis.com/auth/spreadsheets'];
 let sheetsClient;
+
+function getMissingConfig() {
+  return [
+    'GOOGLE_PROJECT_ID',
+    'GOOGLE_CLIENT_EMAIL',
+    'GOOGLE_PRIVATE_KEY',
+    'SPREADSHEET_ID'
+  ].filter((name) => !process.env[name]);
+}
+
+function createConfigError(missing) {
+  const error = new Error(`Missing Google Sheets configuration: ${missing.join(', ')}`);
+  error.status = 500;
+  error.publicMessage = `Google Sheets configuration is missing: ${missing.join(', ')}`;
+  error.expose = true;
+  return error;
+}
 
 function getSheetsClient() {
   if (sheetsClient) {
     return sheetsClient;
   }
 
-  const credentials = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  const authOptions = {
-    scopes
-  };
-
-  if (credentials) {
-    authOptions.credentials = JSON.parse(credentials);
-  } else {
-    const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS
-      || path.resolve(process.cwd(), 'credentials', 'service-account.json');
-
-    if (!fs.existsSync(keyFile)) {
-      const error = new Error(`Google credentials file not found: ${keyFile}`);
-      error.status = 500;
-      error.publicMessage = 'Google service-account credentials are not configured';
-      error.expose = true;
-      throw error;
-    }
-
-    authOptions.keyFile = keyFile;
+  const missing = getMissingConfig();
+  if (missing.length > 0) {
+    throw createConfigError(missing);
   }
 
-  const auth = new google.auth.GoogleAuth(authOptions);
+  const auth = new google.auth.GoogleAuth({
+    credentials: {
+      project_id: process.env.GOOGLE_PROJECT_ID,
+      client_email: process.env.GOOGLE_CLIENT_EMAIL,
+      private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n')
+    },
+    scopes
+  });
+
   sheetsClient = google.sheets({ version: 'v4', auth });
   return sheetsClient;
 }
 
 function getSpreadsheetId() {
   if (!process.env.SPREADSHEET_ID) {
-    const error = new Error('SPREADSHEET_ID is not configured');
-    error.status = 500;
-    error.publicMessage = 'Spreadsheet is not configured';
-    throw error;
+    throw createConfigError(['SPREADSHEET_ID']);
   }
 
   return process.env.SPREADSHEET_ID;
@@ -50,5 +53,6 @@ function getSpreadsheetId() {
 
 module.exports = {
   getSheetsClient,
-  getSpreadsheetId
+  getSpreadsheetId,
+  getMissingConfig
 };

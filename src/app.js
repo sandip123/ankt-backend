@@ -2,10 +2,16 @@ require('dotenv').config();
 
 const cors = require('cors');
 const express = require('express');
+const { getMissingConfig } = require('./config/googleSheets');
 const apiRoutes = require('./routes');
 
 const app = express();
-const port = Number(process.env.PORT) || 5000;
+const port = process.env.PORT || 3000;
+
+const missingConfig = getMissingConfig();
+if (missingConfig.length > 0) {
+  console.error(`Missing required environment variables: ${missingConfig.join(', ')}`);
+}
 
 app.use(cors());
 app.use(express.json());
