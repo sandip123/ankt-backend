@@ -80,12 +80,15 @@ function validateSeries(series) {
 
 async function getFlats(series) {
   const normalizedSeries = validateSeries(series);
-  const rows = await getValues(`${flatSheetName}!A2:F`);
+  const rows = await getValues(`${flatSheetName}!A2:H`);
   const prefix = `${normalizedSeries}-`;
   const flats = rows
     .map((row) => ({
       flatName: String(row[0] || '').trim(),
-      pendingMonths: row[5] || ''
+      ownerName: String(row[1] || '').trim(),
+      isRental: String(row[2] || '').trim(),
+      pendingMonths: row[5] || '',
+      contact: String(row[7] || '').trim()
     }))
     .filter((flat) => flat.flatName.toUpperCase().startsWith(prefix));
 
