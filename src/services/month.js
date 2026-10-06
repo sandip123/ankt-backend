@@ -1,6 +1,6 @@
 const MONTH_FORMAT = /^([0-9]{4})-([0-9]{1,2})$/;
-const US_MONTH_FORMAT = /^([0-9]{1,2})\/([0-9]{4})$/;
-const NAME_MONTH_FORMAT = /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+([0-9]{4})$/i;
+const US_MONTH_FORMAT = /^([0-9]{1,2})\/(?:1\/)?([0-9]{4})$/;
+const NAME_MONTH_FORMAT = /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)[\s-]+([0-9]{4})$/i;
 
 function normalizeMonth(value) {
   const input = String(value || '').trim();
@@ -8,7 +8,7 @@ function normalizeMonth(value) {
 
   if ((match = input.match(MONTH_FORMAT))) {
     const month = Number(match[2]);
-    if (month >= 1 && month <= 12) {
+    if (month >= 1 && month <= 12 && Number(match[1]) > 0) {
       return `${match[1]}-${String(month).padStart(2, '0')}`;
     }
   }
@@ -16,7 +16,7 @@ function normalizeMonth(value) {
   if ((match = input.match(US_MONTH_FORMAT))) {
     const month = Number(match[1]);
     const year = Number(match[2]);
-    if (month >= 1 && month <= 12) {
+    if (month >= 1 && month <= 12 && year > 0) {
       return `${year}-${String(month).padStart(2, '0')}`;
     }
   }
@@ -27,7 +27,7 @@ function normalizeMonth(value) {
       'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
     ];
     const month = monthNames.indexOf(match[1].slice(0, 3).toLowerCase()) + 1;
-    if (month >= 1 && month <= 12) {
+    if (month >= 1 && month <= 12 && Number(match[2]) > 0) {
       return `${match[2]}-${String(month).padStart(2, '0')}`;
     }
   }

@@ -185,8 +185,15 @@ async function getFlatLogs(flatNo) {
 }
 
 async function updateFlat(flatNo, updates) {
+  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+    throw createError(400, 'Flat updates are required');
+  }
   const { rowNumber, flat } = await findFlat(flatNo);
   const isRental = String(updates.isRental || '').trim();
+  if (updates.lastPaidMonth !== undefined && updates.lastPaidMonth !== null
+    && !normalizeMonth(updates.lastPaidMonth)) {
+    throw createError(400, 'Last paid month must be a valid month and year');
+  }
 
   if (isRental && !['YES', 'NO'].includes(isRental.toUpperCase())) {
     throw createError(400, 'Is Rental must be Yes or No');
@@ -213,7 +220,8 @@ async function updateFlat(flatNo, updates) {
     const normalizedValue = String(value).trim();
     const normalizedPreviousValue = String(previousValue || '').trim();
     const valuesAreEqual = field === 'lastPaidMonth'
-      ? normalizeMonth(normalizedValue) === normalizeMonth(normalizedPreviousValue)
+      ? Boolean(normalizeMonth(normalizedValue))
+        && normalizeMonth(normalizedValue) === normalizeMonth(normalizedPreviousValue)
       : normalizedValue === normalizedPreviousValue;
 
     if (valuesAreEqual) {
