@@ -5,6 +5,7 @@ const {
 const {
   getCurrentMonthPaymentSummary
 } = require('./paymentSummary');
+const { normalizeMonth } = require('./month');
 
 const userSheetName = process.env.USER_SHEET_NAME || 'user';
 const flatSheetName = process.env.FLAT_SHEET_NAME || 'Sheet1';
@@ -211,7 +212,11 @@ async function updateFlat(flatNo, updates) {
 
     const normalizedValue = String(value).trim();
     const normalizedPreviousValue = String(previousValue || '').trim();
-    if (normalizedValue === normalizedPreviousValue) {
+    const valuesAreEqual = field === 'lastPaidMonth'
+      ? normalizeMonth(normalizedValue) === normalizeMonth(normalizedPreviousValue)
+      : normalizedValue === normalizedPreviousValue;
+
+    if (valuesAreEqual) {
       return;
     }
 
