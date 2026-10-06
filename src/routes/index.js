@@ -10,6 +10,7 @@ router.post('/', actionController.handleAction);
 router.post('/auth/login', authController.login);
 router.get('/flats', flatController.getFlats);
 router.get('/flats/:flatNo', flatController.getFlatDetails);
+router.get('/flats/:flatNo/logs', flatController.getFlatLogs);
 router.put('/flats/:flatNo', flatController.updateFlat);
 
 module.exports = router;

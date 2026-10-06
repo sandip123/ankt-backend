@@ -2,9 +2,13 @@ const {
   getSheetsClient,
   getSpreadsheetId
 } = require('../config/googleSheets');
+const {
+  getCurrentMonthPaymentSummary
+} = require('./paymentSummary');
 
 const userSheetName = process.env.USER_SHEET_NAME || 'user';
 const flatSheetName = process.env.FLAT_SHEET_NAME || 'Sheet1';
+const logSheetName = process.env.LOG_SHEET_NAME || 'Sheet2';
 
 function createError(status, publicMessage) {
   const error = new Error(publicMessage);
@@ -33,6 +37,7 @@ async function getValues(range, valueRenderOption = 'FORMATTED_VALUE') {
 
 async function login(username, password) {
   const users = await getValues(`${userSheetName}!A2:D`);
+  const flatRows = await getValues(`${flatSheetName}!A2:H`);
 
   const user = users.find((row) => {
     const sheetUsername = String(row[1] || '').trim();
@@ -49,7 +54,8 @@ async function login(username, password) {
   return {
     id: user[0] || '',
     username: String(user[1] || '').trim(),
-    role: String(user[3] || '').trim()
+    role: String(user[3] || '').trim(),
+    ...getCurrentMonthPaymentSummary(flatRows)
   };
 }
 
@@ -130,28 +136,113 @@ async function findFlat(flatNo) {
   };
 }
 
+function createLogEntry(type, field, previousValue, newValue, updatedBy) {
+  return [
+    String(type || '').trim(),
+    String(field || '').trim(),
+    String(previousValue || '').trim(),
+    String(newValue || '').trim(),
+    new Date().toISOString(),
+    String(updatedBy || '').trim() || 'System'
+  ];
+}
+
+async function getFlatLogs(flatNo) {
+  const normalizedFlatNo = String(flatNo || '').trim();
+  const rows = await getValues(`${logSheetName}!A2:G`);
+  const logRows = rows.filter((row) => (
+    String(row[0] || '').trim().toUpperCase() === normalizedFlatNo.toUpperCase()
+  ));
+  const paymentLog = logRows
+    .filter((row) => String(row[0] || '').trim().toUpperCase() === normalizedFlatNo.toUpperCase()
+      && String(row[1] || '').trim().toLowerCase() === 'payment')
+    .map((row) => ({
+      type: row[1],
+      field: row[2],
+      previousValue: row[3],
+      newValue: row[4],
+      updatedAt: row[5],
+      updatedBy: row[6]
+    }));
+  const otherLog = logRows
+    .filter((row) => String(row[0] || '').trim().toUpperCase() === normalizedFlatNo.toUpperCase()
+      && String(row[1] || '').trim().toLowerCase() === 'other')
+    .map((row) => ({
+      type: row[1],
+      field: row[2],
+      previousValue: row[3],
+      newValue: row[4],
+      updatedAt: row[5],
+      updatedBy: row[6]
+    }));
+
+  return {
+    flatNo: normalizedFlatNo,
+    paymentLog,
+    otherLog
+  };
+}
+
 async function updateFlat(flatNo, updates) {
-  const { rowNumber } = await findFlat(flatNo);
+  const { rowNumber, flat } = await findFlat(flatNo);
   const isRental = String(updates.isRental || '').trim();
 
   if (isRental && !['YES', 'NO'].includes(isRental.toUpperCase())) {
     throw createError(400, 'Is Rental must be Yes or No');
   }
 
-  const data = [
-    { range: `${flatSheetName}!B${rowNumber}`, values: [[String(updates.ownerName || '').trim()]] },
-    { range: `${flatSheetName}!C${rowNumber}`, values: [[isRental]] },
-    { range: `${flatSheetName}!D${rowNumber}`, values: [[String(updates.lastPaidMonth || '').trim()]] },
-    { range: `${flatSheetName}!H${rowNumber}`, values: [[String(updates.contact || '').trim()]] }
+  const fields = [
+    { column: 'B', field: 'ownerName', value: String(updates.ownerName || '').trim(), previousValue: flat.ownerName },
+    { column: 'C', field: 'isRental', value: isRental, previousValue: flat.isRental },
+    { column: 'D', field: 'lastPaidMonth', value: String(updates.lastPaidMonth || '').trim(), previousValue: flat.lastPaidMonth },
+    { column: 'E', field: 'monthlyAmount', value: String(updates.monthlyAmount || '').trim(), previousValue: flat.monthlyAmount },
+    { column: 'F', field: 'pendingMonth', value: String(updates.pendingMonth || '').trim(), previousValue: flat.pendingMonth },
+    { column: 'G', field: 'pendingAmount', value: String(updates.pendingAmount || '').trim(), previousValue: flat.pendingAmount },
+    { column: 'H', field: 'contact', value: String(updates.contact || '').trim(), previousValue: flat.contact }
   ];
 
-  await getSheetsClient().spreadsheets.values.batchUpdate({
-    spreadsheetId: getSpreadsheetId(),
-    requestBody: {
-      valueInputOption: 'USER_ENTERED',
-      data
+  const data = [];
+  const logEntries = [];
+
+  fields.forEach(({ column, field, value, previousValue }) => {
+    if (updates[field] === undefined || updates[field] === null) {
+      return;
     }
+
+    const normalizedValue = String(value).trim();
+    const normalizedPreviousValue = String(previousValue || '').trim();
+    if (normalizedValue === normalizedPreviousValue) {
+      return;
+    }
+
+    data.push({ range: `${flatSheetName}!${column}${rowNumber}`, values: [[normalizedValue]] });
+    logEntries.push(createLogEntry(
+      field === 'lastPaidMonth' || field === 'monthlyAmount' ? 'payment' : 'other',
+      field,
+      normalizedPreviousValue,
+      normalizedValue,
+      updates.updatedBy
+    ));
   });
+
+  if (data.length > 0) {
+    const logRows = await getValues(`${logSheetName}!A2:G`);
+    const nextLogRow = logRows.length + 2;
+    logEntries.forEach((entry, index) => {
+      data.push({
+        range: `${logSheetName}!A${nextLogRow + index}:G${nextLogRow + index}`,
+        values: [[flat.flatNo, ...entry]]
+      });
+    });
+
+    await getSheetsClient().spreadsheets.values.batchUpdate({
+      spreadsheetId: getSpreadsheetId(),
+      requestBody: {
+        valueInputOption: 'USER_ENTERED',
+        data
+      }
+    });
+  }
 
   return { flatNo: String(flatNo).trim() };
 }
@@ -161,5 +252,6 @@ module.exports = {
   getSummary,
   getFlats,
   findFlat,
-  updateFlat
+  updateFlat,
+  getFlatLogs
 };
