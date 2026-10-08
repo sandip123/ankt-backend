@@ -1,4 +1,5 @@
 const sheetService = require('../services/sheetService');
+const { issueSession, authorizeUpdate } = require('../services/session');
 
 async function handleAction(req, res) {
   const data = req.body || {};
@@ -22,6 +23,7 @@ async function handleAction(req, res) {
           success: true,
           message: 'Login successful',
           user,
+          token: issueSession(user),
           summary
         });
       }
@@ -37,7 +39,7 @@ async function handleAction(req, res) {
       }
 
       case 'updateFlat': {
-        const result = await sheetService.updateFlat(data.flatNo, data);
+        const result = await sheetService.updateFlat(data.flatNo, authorizeUpdate(req));
         return res.json({
           success: true,
           message: 'Flat details updated successfully',

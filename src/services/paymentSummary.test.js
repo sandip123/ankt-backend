@@ -44,3 +44,17 @@ test('returns zero payment totals when no flat has a payment for the month', () 
     }
   );
 });
+
+test('counts formatted sheet dates and amounts using the India calendar month', () => {
+  const rows = [
+    ['A-001', 'Owner', 'Yes', 'Oct-2026', '1,450'],
+    ['A-002', 'Owner', 'No', '10/1/2026', '300'],
+    ['A-003', 'Owner', 'No', 'September 2026', '300'],
+    ['A-004', 'Owner', 'Yes', '09/2026', '450']
+  ];
+  assert.deepEqual(getCurrentMonthPaymentSummary(rows, new Date('2026-09-30T19:00:00Z')), {
+    currentMonthRentalPayment: 1450, currentMonthNonRentPayment: 300,
+    currentMonthTotalPayment: 1750, lastMonthRentalPayment: 450,
+    lastMonthNonRentPayment: 300, lastMonthTotalPayment: 750
+  });
+});

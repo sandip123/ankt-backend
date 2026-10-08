@@ -1,4 +1,5 @@
 const sheetService = require('../services/sheetService');
+const { issueSession } = require('../services/session');
 
 async function login(req, res, next) {
   const username = String(req.body.username || '').trim();
@@ -18,6 +19,7 @@ async function login(req, res, next) {
       success: true,
       message: 'Login successful',
       user,
+      token: issueSession(user),
       summary
     });
   } catch (error) {

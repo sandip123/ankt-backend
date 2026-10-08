@@ -1,4 +1,5 @@
 const sheetService = require('../services/sheetService');
+const { authorizeUpdate } = require('../services/session');
 
 async function getFlats(req, res, next) {
   try {
@@ -29,7 +30,7 @@ async function getFlatLogs(req, res, next) {
 
 async function updateFlat(req, res, next) {
   try {
-    const result = await sheetService.updateFlat(req.params.flatNo, req.body);
+    const result = await sheetService.updateFlat(req.params.flatNo, authorizeUpdate(req));
     return res.json({
       success: true,
       message: 'Flat details updated successfully',

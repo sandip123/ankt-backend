@@ -1,8 +1,4 @@
-function getMonthKey(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  return `${year}-${month}`;
-}
+const { normalizeMonth } = require('./month');
 
 function getMonthPaymentTotals(rows, month) {
   const totals = {
@@ -12,12 +8,12 @@ function getMonthPaymentTotals(rows, month) {
   };
 
   rows.forEach((row) => {
-    const paymentMonth = String(row[3] || '').trim();
+    const paymentMonth = normalizeMonth(row[3]);
     if (paymentMonth !== month) {
       return;
     }
 
-    const amount = Number(row[4]);
+    const amount = Number(String(row[4] ?? '').replace(/,/g, '').trim());
     if (!Number.isFinite(amount) || amount < 0) {
       return;
     }
@@ -34,9 +30,13 @@ function getMonthPaymentTotals(rows, month) {
 }
 
 function getCurrentMonthPaymentSummary(rows, now = new Date()) {
-  const currentMonth = getMonthKey(now);
-  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonth = getMonthKey(lastMonthDate);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit'
+  }).formatToParts(now);
+  const year = Number(parts.find(part => part.type === 'year').value);
+  const month = Number(parts.find(part => part.type === 'month').value);
+  const currentMonth = `${year}-${String(month).padStart(2, '0')}`;
+  const lastMonth = `${month === 1 ? year - 1 : year}-${String(month === 1 ? 12 : month - 1).padStart(2, '0')}`;
   const current = getMonthPaymentTotals(rows, currentMonth);
   const last = getMonthPaymentTotals(rows, lastMonth);
 
