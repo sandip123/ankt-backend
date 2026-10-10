@@ -15,6 +15,18 @@ test('admin cannot change payments or computed values', () => {
     assert.throws(() => authorizeUpdate(request('ADMIN', { [field]: '123' })), { status: 403 });
   }
 });
+test('superadmin can record payment while ignoring derived values sent by the UI', () => {
+  const updates = authorizeUpdate(request('superadmin', {
+    lastPaidMonth: '10/1/2026',
+    pendingMonth: '11/1/2026',
+    pendingAmount: '0',
+    monthlyAmount: '400'
+  }));
+  assert.equal(updates.lastPaidMonth, '10/1/2026');
+  assert.equal(updates.pendingMonth, undefined);
+  assert.equal(updates.pendingAmount, undefined);
+  assert.equal(updates.monthlyAmount, undefined);
+});
 test('superadmin can record payment but cannot overwrite formulas', () => {
   assert.equal(authorizeUpdate(request('superadmin', { lastPaidMonth: '10/1/2026' })).lastPaidMonth, '10/1/2026');
   assert.throws(() => authorizeUpdate(request('superadmin', { pendingAmount: '0' })), { status: 403 });

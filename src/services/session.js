@@ -29,12 +29,33 @@ function authorizeUpdate(req) {
   const allowed = role === 'SUPERADMIN'
     ? ['ownerName', 'isRental', 'contact', 'lastPaidMonth']
     : ['ownerName', 'isRental', 'contact'];
+  const ignoredDerivedFields = new Set(['monthlyAmount', 'pendingMonth', 'pendingAmount']);
+  const safeUpdates = { ...updates };
+  let hasAllowedUpdate = false;
+
   for (const field of Object.keys(updates)) {
-    if (!allowed.includes(field) && !['action', 'flatNo', 'updatedBy'].includes(field)) {
-      reject(403, 'You are not allowed to update payment or calculated fields.');
+    if (['action', 'flatNo', 'updatedBy'].includes(field)) {
+      continue;
     }
+
+    if (allowed.includes(field)) {
+      hasAllowedUpdate = true;
+      continue;
+    }
+
+    if (ignoredDerivedFields.has(field)) {
+      delete safeUpdates[field];
+      continue;
+    }
+
+    reject(403, 'You are not allowed to update payment or calculated fields.');
   }
-  return { ...updates, updatedBy: session.username };
+
+  if (!hasAllowedUpdate && Object.keys(updates).some((field) => ignoredDerivedFields.has(field))) {
+    reject(403, 'You are not allowed to update payment or calculated fields.');
+  }
+
+  return { ...safeUpdates, updatedBy: session.username };
 }
 
 module.exports = { issueSession, authorizeUpdate };
