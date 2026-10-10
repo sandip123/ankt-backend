@@ -55,6 +55,14 @@ async function handleAction(req, res) {
     }
   } catch (error) {
     const status = Number(error.status) || 500;
+    if (data.action === 'updateFlat') {
+      console.error('[flat-update] Failed', {
+        flatNo: String(data.flatNo || '').trim(),
+        fields: Object.keys(data).filter((field) => !['action', 'flatNo', 'updatedBy'].includes(field)),
+        status,
+        error: error.message
+      });
+    }
     const message = error.expose
       ? error.publicMessage
       : status === 500
