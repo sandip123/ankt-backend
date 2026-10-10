@@ -24,17 +24,30 @@ test('payment from the app writes the new month and its audit log together', asy
     ['A-001', 'payment', 'lastPaidMonth', 'Dec-2025', '01/1/2026']);
 });
 
+test('payment receipt is only logged with the last paid month update', async () => {
+  writes.length = 0;
+  await updateFlat('A-001', { lastPaidMonth: '01/1/2026', receipt_no: 'RCPT-42' });
+  const data = writes[0].requestBody.data;
+  assert.equal(data.length, 3);
+  assert.deepEqual(data[1].values[0].slice(0, 5),
+    ['A-001', 'payment', 'lastPaidMonth', 'Dec-2025', '01/1/2026']);
+  assert.deepEqual(data[2].values[0].slice(0, 5),
+    ['A-001', 'payment', 'receipt_no', '', 'RCPT-42']);
+  assert.equal(data[1].values[0][5], data[2].values[0][5]);
+  assert.equal(data.some(({ range }) => /receipt_no/i.test(range)), false);
+});
+
 test('equivalent paid months do not write or create payment logs', async () => {
   writes.length = 0;
   await updateFlat('A-001', { lastPaidMonth: '12/1/2025' });
   assert.equal(writes.length, 0);
 });
 
-test('owner and contact updates preserve the paid month and calculated fields', async () => {
+test('owner and contact updates do not create other logs', async () => {
   writes.length = 0;
   await updateFlat('A-001', { ownerName: 'New owner', contact: '' });
   const data = writes[0].requestBody.data;
-  assert.equal(data.length, 4);
+  assert.equal(data.length, 2);
   assert.match(data[0].range, /!B2$/);
   assert.match(data[1].range, /!H2$/);
   assert.deepEqual(data[1].values, [['']]);

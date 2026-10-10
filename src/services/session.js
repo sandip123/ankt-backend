@@ -27,7 +27,7 @@ function authorizeUpdate(req) {
   if (!['ADMIN', 'SUPERADMIN'].includes(role)) reject(403, 'You cannot edit owner details.');
   const updates = req.body || {};
   const allowed = role === 'SUPERADMIN'
-    ? ['ownerName', 'isRental', 'contact', 'lastPaidMonth']
+    ? ['ownerName', 'isRental', 'contact', 'lastPaidMonth', 'receipt_no']
     : ['ownerName', 'isRental', 'contact'];
   const ignoredDerivedFields = new Set(['monthlyAmount', 'pendingMonth', 'pendingAmount']);
   const safeUpdates = { ...updates };
@@ -53,6 +53,10 @@ function authorizeUpdate(req) {
 
   if (!hasAllowedUpdate && Object.keys(updates).some((field) => ignoredDerivedFields.has(field))) {
     reject(403, 'You are not allowed to update payment or calculated fields.');
+  }
+  if (updates.receipt_no !== undefined
+    && (updates.lastPaidMonth === undefined || updates.lastPaidMonth === null)) {
+    reject(403, 'Receipt number can only be submitted with a last paid month update.');
   }
 
   return { ...safeUpdates, updatedBy: session.username };

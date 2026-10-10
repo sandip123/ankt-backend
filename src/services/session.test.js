@@ -11,7 +11,7 @@ test('admin edits owner information with authenticated audit identity', () => {
   })), { ownerName: 'Owner', contact: '123', isRental: 'No', updatedBy: 'OwnerAdmin' });
 });
 test('admin cannot change payments or computed values', () => {
-  for (const field of ['lastPaidMonth', 'monthlyAmount', 'pendingMonth', 'pendingAmount']) {
+  for (const field of ['lastPaidMonth', 'receipt_no', 'monthlyAmount', 'pendingMonth', 'pendingAmount']) {
     assert.throws(() => authorizeUpdate(request('ADMIN', { [field]: '123' })), { status: 403 });
   }
 });
@@ -29,6 +29,11 @@ test('superadmin can record payment while ignoring derived values sent by the UI
 });
 test('superadmin can record payment but cannot overwrite formulas', () => {
   assert.equal(authorizeUpdate(request('superadmin', { lastPaidMonth: '10/1/2026' })).lastPaidMonth, '10/1/2026');
+  assert.equal(authorizeUpdate(request('superadmin', {
+    lastPaidMonth: '10/1/2026',
+    receipt_no: 'RCPT-42'
+  })).receipt_no, 'RCPT-42');
+  assert.throws(() => authorizeUpdate(request('superadmin', { receipt_no: 'RCPT-42' })), { status: 403 });
   assert.throws(() => authorizeUpdate(request('superadmin', { pendingAmount: '0' })), { status: 403 });
 });
 test('view-only and unauthenticated requests cannot update', () => {

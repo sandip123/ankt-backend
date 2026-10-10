@@ -137,13 +137,13 @@ async function findFlat(flatNo) {
   };
 }
 
-function createLogEntry(type, field, previousValue, newValue, updatedBy) {
+function createLogEntry(type, field, previousValue, newValue, updatedBy, updatedAt) {
   return [
     String(type || '').trim(),
     String(field || '').trim(),
     String(previousValue || '').trim(),
     String(newValue || '').trim(),
-    new Date().toISOString(),
+    updatedAt || new Date().toISOString(),
     String(updatedBy || '').trim() || 'System'
   ];
 }
@@ -165,22 +165,10 @@ async function getFlatLogs(flatNo) {
       updatedAt: row[5],
       updatedBy: row[6]
     }));
-  const otherLog = logRows
-    .filter((row) => String(row[0] || '').trim().toUpperCase() === normalizedFlatNo.toUpperCase()
-      && String(row[1] || '').trim().toLowerCase() === 'other')
-    .map((row) => ({
-      type: row[1],
-      field: row[2],
-      previousValue: row[3],
-      newValue: row[4],
-      updatedAt: row[5],
-      updatedBy: row[6]
-    }));
 
   return {
     flatNo: normalizedFlatNo,
-    paymentLog,
-    otherLog
+    paymentLog
   };
 }
 
@@ -211,6 +199,7 @@ async function updateFlat(flatNo, updates) {
 
   const data = [];
   const logEntries = [];
+  let paymentMonthChanged = false;
 
   fields.forEach(({ column, field, value, previousValue }) => {
     if (updates[field] === undefined || updates[field] === null) {
@@ -229,19 +218,36 @@ async function updateFlat(flatNo, updates) {
     }
 
     data.push({ range: `${flatSheetName}!${column}${rowNumber}`, values: [[normalizedValue]] });
-    logEntries.push(createLogEntry(
-      field === 'lastPaidMonth' || field === 'monthlyAmount' ? 'payment' : 'other',
-      field,
-      normalizedPreviousValue,
-      normalizedValue,
-      updates.updatedBy
-    ));
+    if (field === 'lastPaidMonth') {
+      paymentMonthChanged = true;
+      logEntries.push({
+        field,
+        entry: createLogEntry(
+          'payment',
+          field,
+          normalizedPreviousValue,
+          normalizedValue,
+          updates.updatedBy
+        )
+      });
+    }
   });
+
+  const receiptNo = updates.receipt_no === undefined || updates.receipt_no === null
+    ? ''
+    : String(updates.receipt_no).trim();
+  if (paymentMonthChanged && receiptNo) {
+    const updatedAt = logEntries[0].entry[4];
+    const updatedBy = updates.updatedBy;
+    logEntries.push({
+      entry: createLogEntry('payment', 'receipt_no', '', receiptNo, updatedBy, updatedAt)
+    });
+  }
 
   if (data.length > 0) {
     const logRows = await getValues(`${logSheetName}!A2:G`);
     const nextLogRow = logRows.length + 2;
-    logEntries.forEach((entry, index) => {
+    logEntries.forEach(({ entry }, index) => {
       data.push({
         range: `${logSheetName}!A${nextLogRow + index}:G${nextLogRow + index}`,
         values: [[flat.flatNo, ...entry]]
