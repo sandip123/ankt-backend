@@ -168,7 +168,8 @@ async function getFlatLogs(flatNo) {
 
   return {
     flatNo: normalizedFlatNo,
-    paymentLog
+    paymentLog,
+    otherLog: []
   };
 }
 

@@ -2,15 +2,48 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const configPath = require.resolve('../config/googleSheets');
 const writes = [];
+let logRows = [];
 const client = { spreadsheets: { values: {
   get: async ({ range }) => ({ data: { values: range.endsWith('!A2:H')
     ? [['A-001', 'Owner', 'No', 'Dec-2025', '300', '10', '3000', '123']]
-    : [] } }),
+    : range.endsWith('!A2:G') ? logRows : [] } }),
   batchUpdate: async (request) => { writes.push(request); }
 } } };
 require.cache[configPath] = { id: configPath, filename: configPath, loaded: true,
   exports: { getSheetsClient: () => client, getSpreadsheetId: () => 'test-sheet' } };
-const { updateFlat } = require('./sheetService');
+const { getFlatLogs, updateFlat } = require('./sheetService');
+
+test('flat logs return the expected shape with payment entries and no other entries', async () => {
+  logRows = [
+    ['A-001', 'payment', 'lastPaidMonth', 'Dec-2025', '01/1/2026', '2026-10-10T10:00:00.000Z', 'Admin'],
+    ['A-001', 'payment', 'receipt_no', '', 'RCPT-42', '2026-10-10T10:00:00.000Z', 'Admin'],
+    ['A-001', 'other', 'ownerName', 'Old owner', 'New owner', '2026-10-10T10:00:00.000Z', 'Admin']
+  ];
+  const result = await getFlatLogs('A-001');
+  assert.deepEqual(result, {
+    flatNo: 'A-001',
+    paymentLog: [
+      {
+        type: 'payment',
+        field: 'lastPaidMonth',
+        previousValue: 'Dec-2025',
+        newValue: '01/1/2026',
+        updatedAt: '2026-10-10T10:00:00.000Z',
+        updatedBy: 'Admin'
+      },
+      {
+        type: 'payment',
+        field: 'receipt_no',
+        previousValue: '',
+        newValue: 'RCPT-42',
+        updatedAt: '2026-10-10T10:00:00.000Z',
+        updatedBy: 'Admin'
+      }
+    ],
+    otherLog: []
+  });
+  logRows = [];
+});
 
 test('payment from the app writes the new month and its audit log together', async () => {
   writes.length = 0;
